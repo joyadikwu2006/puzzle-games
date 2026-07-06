@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Real Bug or Fake Bug</title>
+  <style>
+    body {
+      background-color: #12172b;
+      color: #f5f3ed;
+      font-family: sans-serif;
+      text-align: center;
+      padding: 60px;
+    }
+
+    h1 {
+      color: #f2a93b;
+    }
+
+    #claim {
+      font-size: 20px;
+      max-width: 500px;
+      margin: 30px auto;
+    }
+
+    button {
+      font-size: 16px;
+      padding: 12px 24px;
+      margin: 0 10px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: transform 0.15s ease, opacity 0.15s ease;
+    }
+
+    button:hover:not(:disabled) {
+    transform: translateY(-2px);
+    }
+
+    button:disabled {
+    opacity: 0.5;
+    cursor: default;
+    }
+
+    #realBtn {
+      background-color: #6fcf97;
+    }
+
+    #fakeBtn {
+      background-color: #e85c4a;
+    }
+
+    @keyframes popIn {
+    0%   { transform: scale(0.7); opacity: 0; }
+    60%  { transform: scale(1.1); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+    }
+
+    @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20%      { transform: translateX(-6px); }
+    40%      { transform: translateX(6px); }
+    60%      { transform: translateX(-4px); }
+    80%      { transform: translateX(4px); }
+    }
+
+    #result.correct {
+    color: #6fcf97;
+    animation: popIn 0.4s ease;
+    }
+
+    #result.wrong {
+    color: #e85c4a;
+    animation: shake 0.4s ease;
+    }
+
+    #answerRow {
+    display: flex;
+    justify-content: space-between;
+    max-width: 400px;
+    margin: 20px auto;
+    }
+
+    #controlRow {
+    margin: 20px auto;
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    }
+
+    .bigEmoji {
+    font-size: 80px;
+    display: block;
+    margin: 10px 0;
+    animation: popIn 0.5s ease;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Real Bug // Fake Bug</h1>
+
+  <p id="claim">The first computer bug was an actual moth found in a computer.</p>
+
+  <div id="answerRow">
+    <button id="realBtn">REAL</button>
+    <button id="fakeBtn">FAKE</button>
+  </div>
+
+  <div id="controlRow">
+    <button id="nextBtn">Next Question →</button>
+    <button id="restartBtn" style="display: none;">Play Again ↻</button>
+  </div>
+
+  <p id="timer">⏱ 8</p>
+  <p id="progress">Question 1 of 8</p>
+  <p id="result"></p>
+  <p id="score">Score: 0</p>
+<script>
+  // 1. Data — now nested: levels, each containing its own questions
+  const levels = [
+    {
+      name: "Level 1: Easy",
+      passScore: 2,
+      questions: [
+        { claim: "The first computer bug was an actual moth found in a relay.", isReal: true },
+        { claim: "Python is named after the snake.", isReal: false },
+        { claim: "HTML is officially classified as a programming language.", isReal: false },
+        { claim: "The '@' symbol in email addresses was invented specifically for ARPANET email in 1971.", isReal: true },
+        { claim: "CSS stands for Cascading Style Sheets.", isReal: true },
+        { claim: "In most programming languages, array indexing starts at 1, not 0.", isReal: false },
+        { claim: "Go and Google both start with the same first two letters by pure coincidence.", isReal: true }
+      ]
+    },
+    {
+      name: "Level 2: Medium",
+      passScore: 2,
+      questions: [
+        { claim: "Git was built by Linus Torvalds in about two weeks.", isReal: true },
+        { claim: "The Y2K bug happened because many systems stored years using only two digits.", isReal: true },
+        { claim: "JavaScript took about two years of design meetings before its 1995 release.", isReal: false },
+        { claim: "The Go programming language was created at Google and first released in 2009.", isReal: true },
+        { claim: "In JavaScript, using === instead of == checks type as well as value.", isReal: true },
+        { claim: "SQL was originally called 'SEQUEL' before being renamed for trademark reasons.", isReal: true }
+     ]
+    },
+    {
+      name: "Level 3: Hard",
+      passScore: 2,
+      questions: [
+        { claim: "NASA lost a Mars orbiter because one team used metric units and another used imperial units.", isReal: true },
+        { claim: "Ariane 5's first rocket launch failed due to a division-by-zero error in its parachute code.", isReal: false },
+        { claim: "The QWERTY keyboard layout was originally designed to slow typists down and prevent jams.", isReal: true },
+        { claim: "The famous 'Hello, World!' program tradition traces back to a 1978 C programming book by Kernighan and Ritchie.", isReal: true },
+        { claim: "Docker containers work by running a lightweight full virtual machine for each container.", isReal: false },
+        { claim: "The term 'debugging' was first popularized after Grace Hopper's team found an actual moth in a relay.", isReal: true }
+    ]
+    }
+  ];
+
+  function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const temp = array[i];
+      array[i] = array[j];
+      array[j] = temp;
+    }
+  }
+  // shuffle the questions inside every level
+  levels.forEach(function(level) {
+    shuffleArray(level.questions);
+  });
+
+  // 2. Tracking variables
+  let currentLevel = 0;   // ← new: which level we're on
+  let currentIndex = 0;   // now means: which question INSIDE the current level
+  let score = 0;          // score within the current level
+
+  // 3. Grab elements
+  const claimText = document.getElementById("claim");
+  const realBtn = document.getElementById("realBtn");
+  const fakeBtn = document.getElementById("fakeBtn");
+  const resultText = document.getElementById("result");
+  const nextBtn = document.getElementById("nextBtn");
+  const scoreText = document.getElementById("score");
+  const restartBtn = document.getElementById("restartBtn");
+  const progressText = document.getElementById("progress");
+  const timerDisplay = document.getElementById("timer");
+
+let timeLeft = 8;
+let timerId = null;   // will hold the running timer's ID
+
+  // 4. Helper functions
+  function updateScore() {
+    scoreText.textContent = "Score: " + score;
+  }
+
+  function updateProgress() {
+    const level = levels[currentLevel];
+    progressText.textContent = level.name + " — Question " + (currentIndex + 1) + " of " + level.questions.length;
+  }
+
+  function loadQuestion() {
+    const level = levels[currentLevel];
+    claimText.textContent = level.questions[currentIndex].claim;
+    resultText.textContent = "";
+    resultText.classList.remove("correct", "wrong");
+    realBtn.disabled = false;
+    fakeBtn.disabled = false;
+    updateProgress();
+    startTimer(); 
+  }
+
+    function getGrade(percent) {
+    if (percent === 100) {
+        return "🏆 Excellent!";
+    } else if (percent >= 75) {
+        return "🎉 Very Good!";
+    } else if (percent >= 50) {
+        return "👍 Good!";
+    } else {
+        return "😬 Bad — needs work";
+    }
+    }
+
+    function getBigEmoji(percent) {
+    if (percent === 100) {
+        return "🏆";
+    } else if (percent >= 75) {
+        return "🌟";
+    } else if (percent >= 50) {
+        return "🙂";
+    } else {
+        return "😅";
+    }
+    }
+
+  function endLevel() {
+  const level = levels[currentLevel];
+  realBtn.disabled = true;
+  fakeBtn.disabled = true;
+  nextBtn.disabled = true;
+
+  const percent = (score / level.questions.length) * 100;
+  const grade = getGrade(percent);
+  const bigEmoji = getBigEmoji(percent);   // ← new
+
+  if (score >= level.passScore) {
+    if (currentLevel + 1 < levels.length) {
+      claimText.innerHTML = "<span class='bigEmoji'>" + bigEmoji + "</span>Level passed! " + grade + " Score: " + score + " / " + level.questions.length + " — click to continue.";
+      restartBtn.textContent = "Next Level →";
+    } else {
+      claimText.innerHTML = "<span class='bigEmoji'>" + bigEmoji + "</span>🏁 You beat the whole game! " + grade + " Final score: " + score + " / " + level.questions.length;
+      restartBtn.textContent = "Play Again from Level 1";
+    }
+  } else {
+    claimText.innerHTML = "<span class='bigEmoji'>" + bigEmoji + "</span>Level failed. " + grade + " Score: " + score + " / " + level.questions.length + " (needed " + level.passScore + "). Try again.";
+    restartBtn.textContent = "Retry Level";
+  }
+
+  restartBtn.style.display = "inline-block";
+}
+
+  function startTimer() {
+  clearInterval(timerId);   // stop any previous timer first
+  timeLeft = 8;
+  timerDisplay.textContent = "⏱ " + timeLeft;
+
+  timerId = setInterval(function() {
+    timeLeft = timeLeft - 1;
+    timerDisplay.textContent = "⏱ " + timeLeft;
+
+    if (timeLeft <= 0) {
+      clearInterval(timerId);
+      timeUp();
+    }
+  }, 1000);
+}
+    function timeUp() {
+  resultText.textContent = "⏰ Time's up!";
+  realBtn.disabled = true;
+  fakeBtn.disabled = true;
+}
+
+
+
+  // 5. Show first question and initial score on load
+  loadQuestion();
+  updateScore();
+
+  // 6. Button behavior
+  realBtn.addEventListener("click", function() {
+    clearInterval(timerId);
+    const level = levels[currentLevel];
+    if (level.questions[currentIndex].isReal === true) {
+      score = score + 1;
+      updateScore();
+      resultText.textContent = "Correct! ✅";
+      resultText.classList.add("correct");
+    } else {
+      resultText.textContent = "Nope, that one's fake. ❌";
+      resultText.classList.add("wrong");
+    }
+    realBtn.disabled = true;
+    fakeBtn.disabled = true;
+  });
+
+  fakeBtn.addEventListener("click", function() {
+  clearInterval(timerId);
+  const level = levels[currentLevel];
+  if (level.questions[currentIndex].isReal === false) {
+    score = score + 1;
+    updateScore();
+    resultText.textContent = "Correct! ✅";
+    resultText.classList.add("correct"); 
+  } else {
+    resultText.textContent = "Nope, that one's real. ❌";
+    resultText.classList.add("wrong");
+  }
+  realBtn.disabled = true;
+  fakeBtn.disabled = true;
+});
+
+  nextBtn.addEventListener("click", function() {
+  const level = levels[currentLevel];
+  currentIndex = currentIndex + 1;
+
+  if (currentIndex < level.questions.length) {
+    loadQuestion();
+  } else {
+    endLevel();
+  }
+});
+
+  // 7. Restart behavior
+ restartBtn.addEventListener("click", function() {
+  const level = levels[currentLevel];
+
+  if (score >= level.passScore) {
+    if (currentLevel + 1 < levels.length) {
+      currentLevel = currentLevel + 1;   // move to next level
+    } else {
+      currentLevel = 0;                   // beat the game, start over from Level 1
+    }
+  }
+  // if score didn't pass, currentLevel stays the same — repeat it
+
+  shuffleArray(levels[currentLevel].questions);
+  currentIndex = 0;
+  score = 0;
+  updateScore();
+  loadQuestion();
+  nextBtn.disabled = false;
+  restartBtn.style.display = "none";
+});
+</script></body>
+</html>
